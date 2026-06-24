@@ -64,7 +64,7 @@ pipeline {
                                 BRANCH_TAG=$(echo ${GIT_BRANCH:-${BRANCH_NAME:-main}} | sed 's|origin/||' | tr '/' '-' | tr '[:upper:]' '[:lower:]')
                                 echo $REG_PASS | docker login -u $REG_USER --password-stdin
                                 docker tag $DOCKER_IMAGE:$DOCKER_TAG pav30/webvory-intern-frontend:$DOCKER_TAG-$BRANCH_TAG
-                                docker push pav30/webvory-intern-frontend:$DOCKER_TAG-$BRANCH_TAG
+                                docker push pav30/webvory-intern-frontend:$DOCKER_TAG-$BRANCH_TAG || true
                             '''
                         }
                     }
