@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Task Manager</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f0f2f5;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 40px 16px;
+    }
+
+    .container { width: 100%; max-width: 600px; }
+
+    h1 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: #1a1a2e;
+      margin-bottom: 24px;
+    }
+
+    /* Add task form */
+    .add-form {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      margin-bottom: 24px;
+    }
+
+    .add-form input, .add-form textarea {
+      width: 100%;
+      border: 1px solid #dde1e7;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s;
+      font-family: inherit;
+    }
+
+    .add-form input:focus, .add-form textarea:focus {
+      border-color: #4f46e5;
+    }
+
+    .add-form textarea { resize: vertical; min-height: 72px; margin-top: 10px; }
+
+    .add-form button {
+      margin-top: 12px;
+      width: 100%;
+      padding: 10px;
+      background: #4f46e5;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .add-form button:hover { background: #4338ca; }
+
+    /* Task list */
+    #task-list { display: flex; flex-direction: column; gap: 12px; }
+
+    .task-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 16px 18px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      transition: opacity 0.2s;
+    }
+
+    .task-card.done { opacity: 0.55; }
+
+    .task-card input[type="checkbox"] {
+      margin-top: 3px;
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+      accent-color: #4f46e5;
+      flex-shrink: 0;
+    }
+
+    .task-body { flex: 1; min-width: 0; }
+
+    .task-title {
+      font-weight: 600;
+      color: #1a1a2e;
+      font-size: 0.97rem;
+      word-break: break-word;
+    }
+
+    .task-card.done .task-title { text-decoration: line-through; color: #888; }
+
+    .task-desc {
+      color: #666;
+      font-size: 0.875rem;
+      margin-top: 4px;
+      word-break: break-word;
+    }
+
+    .task-date {
+      color: #aaa;
+      font-size: 0.75rem;
+      margin-top: 6px;
+    }
+
+    .delete-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #ccc;
+      font-size: 1.1rem;
+      line-height: 1;
+      padding: 2px 4px;
+      border-radius: 4px;
+      transition: color 0.15s;
+      flex-shrink: 0;
+    }
+
+    .delete-btn:hover { color: #ef4444; }
+
+    /* Empty state */
+    .empty {
+      text-align: center;
+      color: #aaa;
+      padding: 48px 0;
+      font-size: 0.95rem;
+    }
+
+    /* Toast */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: #1a1a2e;
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      opacity: 0;
+      transition: opacity 0.3s, transform 0.3s;
+      pointer-events: none;
+    }
+
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Task Manager</h1>
+
+    <div class="add-form">
+      <input id="inp-title" type="text" placeholder="Task title..." />
+      <textarea id="inp-desc" placeholder="Description (optional)"></textarea>
+      <button onclick="createTask()">+ Add Task</button>
+    </div>
+
+    <div id="task-list"></div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    const API = '/api/v1/tasks';
+
+    async function loadTasks() {
+      const res = await fetch(API);
+      const tasks = await res.json();
+      render(tasks);
+    }
+
+    function render(tasks) {
+      const list = document.getElementById('task-list');
+      if (!tasks.length) {
+        list.innerHTML = '<div class="empty">No tasks yet. Add one above!</div>';
+        return;
+      }
+      list.innerHTML = tasks.map(t => `
+        <div class="task-card ${t.completed ? 'done' : ''}" id="card-${t.id}">
+          <input type="checkbox" ${t.completed ? 'checked' : ''}
+            onchange="toggleTask(${t.id}, this.checked)" />
+          <div class="task-body">
+            <div class="task-title">${esc(t.title)}</div>
+            ${t.description ? `<div class="task-desc">${esc(t.description)}</div>` : ''}
+            <div class="task-date">${new Date(t.created_at).toLocaleString()}</div>
+          </div>
+          <button class="delete-btn" onclick="deleteTask(${t.id})" title="Delete">✕</button>
+        </div>
+      `).join('');
+    }
+
+    async function createTask() {
+      const title = document.getElementById('inp-title').value.trim();
+      const description = document.getElementById('inp-desc').value.trim();
+      if (!title) { toast('Title is required'); return; }
+
+      await fetch(API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, description: description || null, completed: false }),
+      });
+
+      document.getElementById('inp-title').value = '';
+      document.getElementById('inp-desc').value = '';
+      toast('Task added');
+      loadTasks();
+    }
+
+    async function toggleTask(id, completed) {
+      await fetch(`${API}/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ completed }),
+      });
+      loadTasks();
+    }
+
+    async function deleteTask(id) {
+      await fetch(`${API}/${id}`, { method: 'DELETE' });
+      toast('Task deleted');
+      loadTasks();
+    }
+
+    function esc(str) {
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    let toastTimer;
+    function toast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+    }
+
+    // Enter key submits
+    document.getElementById('inp-title').addEventListener('keydown', e => {
+      if (e.key === 'Enter') createTask();
+    });
+
+    loadTasks();
+  </script>
+</body>
+</html>
