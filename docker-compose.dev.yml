@@ -1,0 +1,31 @@
+version: "3.9"
+
+# Override for local development — use with:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: taskapp:dev
+    volumes:
+      - ./app:/app/app          # hot-reload source
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    environment:
+      APP_DEBUG: "true"
+      APP_ENV: development
+    ports:
+      - "8000:8000"             # expose directly for dev tools
+
+  db:
+    ports:
+      - "5432:5432"             # expose for local DB clients
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  nginx:
+    ports:
+      - "8080:80"               # avoid privileged port in dev
