@@ -35,6 +35,23 @@ pipeline {
             }
         }
 
+        stage('Trivy Scan') {
+            when { expression { return fileExists('Dockerfile') } }
+            steps {
+                catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                    script {
+                        def trivyOk = sh(script: 'which trivy 2>/dev/null', returnStatus: true) == 0
+                        if (trivyOk) {
+                            sh "trivy image --exit-code 0 --severity HIGH,CRITICAL --format table ${DOCKER_IMAGE}:${DOCKER_TAG} | tee trivy-report.txt"
+                            archiveArtifacts artifacts: 'trivy-report.txt', allowEmptyArchive: true
+                        } else {
+                            echo 'Trivy not available — skipping scan'
+                        }
+                    }
+                }
+            }
+        }
+
         stage('Push to Registry') {
             when { expression { return fileExists('Dockerfile') } }
             steps {
@@ -45,14 +62,14 @@ pipeline {
                                 BRANCH_TAG=$(echo ${GIT_BRANCH:-${BRANCH_NAME:-main}} | sed 's|origin/||' | tr '/' '-' | tr '[:upper:]' '[:lower:]')
                                 echo $REG_PASS | docker login -u $REG_USER --password-stdin
                                 docker tag $DOCKER_IMAGE:$DOCKER_TAG pav30/webvory-intern-fontend:$DOCKER_TAG-$BRANCH_TAG
-                                docker push pav30/webvory-intern-fontend:$DOCKER_TAG-$BRANCH_TAG || echo 'Push to registry failed!'
+                                docker push pav30/webvory-intern-fontend:$DOCKER_TAG-$BRANCH_TAG
                             '''
                         }
                     }
                 }
             }
         }
-        
+
         stage('Deploy to VM') {
             when { expression { return fileExists('Dockerfile') } }
             steps {
